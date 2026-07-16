@@ -138,8 +138,17 @@ const { useState, useEffect } = React;
     function dbRef(rawPath) {
       const cleanPath = String(rawPath || '').replace(/^\/+|\/+$/g, '');
       const doFetch = async (p) => {
-        const res = await fetch(`${WORKER_BASE}/api/rtdb/get?path=${encodeURIComponent(p)}`, { headers: __authHeaders() });
-        if (!res.ok) throw new Error('HTTP ' + res.status);
+        let res;
+        try {
+          res = await fetch(`${WORKER_BASE}/api/rtdb/get?path=${encodeURIComponent(p)}`, { headers: __authHeaders() });
+        } catch (netErr) {
+          throw new Error('Tidak bisa menghubungi server (' + (netErr && netErr.message ? netErr.message : 'jaringan gagal') + ')');
+        }
+        if (!res.ok) {
+          let bodyText = '';
+          try { bodyText = await res.text(); } catch (e) {}
+          throw new Error('HTTP ' + res.status + (bodyText ? (': ' + bodyText.slice(0, 200)) : ''));
+        }
         const data = await res.json();
         return data.value;
       };
@@ -799,6 +808,7 @@ const { useState, useEffect } = React;
       const [storeDirectory, setStoreDirectory] = useState([]);
       const [dirLoading, setDirLoading] = useState(true);
       const [dirError, setDirError] = useState(false);
+      const [dirErrorDetail, setDirErrorDetail] = useState('');
       const [dirFromCache, setDirFromCache] = useState(false);
       const [adminCheckError, setAdminCheckError] = useState(false);
       const [reloadTick, setReloadTick] = useState(0);
@@ -842,8 +852,9 @@ const { useState, useEffect } = React;
               setDirFromCache(false);
               try { localStorage.setItem('tarobun_dir_cache', JSON.stringify(list)); } catch (e) {}
             })
-            .catch(() => {
+            .catch((err) => {
               if (cancelled) return;
+              setDirErrorDetail(String(err && err.message ? err.message : err));
               if (attempt < MAX_ATTEMPTS) {
                 setTimeout(tryLoad, 1000 * attempt); // jeda makin lama tiap percobaan ulang
               } else {
@@ -1021,7 +1032,7 @@ const { useState, useEffect } = React;
 
             {dirError && (
               <div className="bg-amber-50 border border-amber-200 text-amber-700 text-xs font-semibold rounded-lg px-3 py-2 mb-4 flex items-center justify-between gap-2">
-                <span>Gagal memuat data dari server. Cek koneksi internet Anda.</span>
+                <span>Gagal memuat data dari server. Cek koneksi internet Anda.{dirErrorDetail ? ` (Detail: ${dirErrorDetail})` : ''}</span>
                 <button type="button" onClick={() => setReloadTick(t => t + 1)} className="shrink-0 bg-amber-600 text-white text-[10px] font-bold px-2 py-1 rounded-lg">Muat Ulang</button>
               </div>
             )}
