@@ -8,7 +8,7 @@
   <meta name="description" content="Aplikasi internal Tarobun Green Pramuka Hub untuk pencatatan penjualan, stok inventory, laporan suhu, dan koordinasi pusat.">
 
   <!-- Pengerasan keamanan dasar sisi browser (mitigasi injeksi script/clickjacking) -->
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://unpkg.com https://cdn.tailwindcss.com https://www.gstatic.com; style-src 'self' 'unsafe-inline' https://cdn.tailwindcss.com https://unpkg.com; img-src 'self' data: blob: https:; media-src 'self' blob: https:; font-src 'self' data: https://unpkg.com; connect-src 'self' https://*.firebaseio.com https://*.firebasedatabase.app wss://*.firebaseio.com wss://*.firebasedatabase.app https://*.googleapis.com https://unpkg.com https://api.telegram.org; frame-ancestors 'none'; base-uri 'self'; object-src 'none';">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://unpkg.com https://cdn.tailwindcss.com https://www.gstatic.com; style-src 'self' 'unsafe-inline' https://cdn.tailwindcss.com https://unpkg.com; img-src 'self' data: blob: https:; media-src 'self' blob: https:; font-src 'self' data: https://unpkg.com; connect-src 'self' https://*.workers.dev https://unpkg.com https://api.telegram.org; frame-ancestors 'none'; base-uri 'self'; object-src 'none';">
   <meta http-equiv="X-Content-Type-Options" content="nosniff">
   <meta name="referrer" content="strict-origin-when-cross-origin">
 
@@ -35,6 +35,17 @@
 <!-- Lucide -->
 <script src="https://unpkg.com/lucide@latest" defer></script>
 
+<!-- Tipografi: Inter (teks/UI/data, sangat jelas di ukuran kecil) + Plus Jakarta Sans (judul/heading,
+     lebih berkarakter & modern). Dimuat dari unpkg (sudah di-whitelist di CSP di atas) supaya tidak
+     perlu menambah domain baru (fonts.googleapis.com/fonts.gstatic.com TIDAK ada di CSP saat ini). -->
+<link rel="stylesheet" href="https://unpkg.com/@fontsource/inter@5.0.16/400.css">
+<link rel="stylesheet" href="https://unpkg.com/@fontsource/inter@5.0.16/500.css">
+<link rel="stylesheet" href="https://unpkg.com/@fontsource/inter@5.0.16/600.css">
+<link rel="stylesheet" href="https://unpkg.com/@fontsource/inter@5.0.16/700.css">
+<link rel="stylesheet" href="https://unpkg.com/@fontsource/plus-jakarta-sans@5.0.16/600.css">
+<link rel="stylesheet" href="https://unpkg.com/@fontsource/plus-jakarta-sans@5.0.16/700.css">
+<link rel="stylesheet" href="https://unpkg.com/@fontsource/plus-jakarta-sans@5.0.16/800.css">
+
   <script>
     // Karena script CDN di atas sekarang di-defer, konfigurasi tailwind ini
     // (script inline, TIDAK ikut defer) harus ditunda sampai window "load"
@@ -46,9 +57,47 @@
             colors: {
               brand: {
                 purple: '#6D28D9',
-                dark: '#1E1B4B'
-              }
-            }
+                dark: '#1E1B4B',
+                // Skala brand tambahan — dipakai utk gradient header/tombol utama yang lebih
+                // dalam & "premium" dibanding purple-800/indigo-900 polos, tetap satu keluarga
+                // warna dengan brand.purple yang sudah ada supaya identitas tidak berubah drastis.
+                50:  '#F5F3FF',
+                100: '#EDE9FE',
+                600: '#7C3AED',
+                700: '#6D28D9',
+                800: '#5B21B6',
+                900: '#3B1370',
+              },
+              // Aksen hangat (nuansa "roti panggang") — dipakai TIPIS-TIPIS untuk highlight,
+              // badge, atau progress, bukan warna dominan, supaya dashboard tidak monoton ungu.
+              wheat: {
+                50:  '#FFFBEB',
+                100: '#FEF3C7',
+                500: '#D97706',
+                600: '#B45309',
+              },
+              ink: '#1E1B2E',
+            },
+            fontFamily: {
+              // font-sans (body/UI/data) tetap default di seluruh app tanpa perlu ganti className
+              // manapun; font-display dipakai eksplisit hanya di judul-judul besar/hero.
+              sans: ['Inter', 'ui-sans-serif', 'system-ui', 'sans-serif'],
+              display: ['"Plus Jakarta Sans"', 'Inter', 'ui-sans-serif', 'sans-serif'],
+            },
+            boxShadow: {
+              // Bayangan lembut & "mengambang", lebih halus dari shadow-lg/xl bawaan Tailwind
+              // yang cenderung keras — dipakai utk kartu & modal supaya kesan "ringan".
+              soft: '0 2px 8px -2px rgba(30, 27, 46, 0.06), 0 8px 24px -8px rgba(30, 27, 46, 0.10)',
+              softHover: '0 4px 14px -2px rgba(30, 27, 46, 0.08), 0 16px 32px -12px rgba(30, 27, 46, 0.16)',
+            },
+            keyframes: {
+              shimmer: {
+                '100%': { transform: 'translateX(100%)' },
+              },
+            },
+            animation: {
+              shimmer: 'shimmer 1.6s ease-in-out infinite',
+            },
           }
         }
       };
@@ -89,6 +138,104 @@
       animation: tarobunSplashTextIn 0.5s ease-out both;
       animation-delay: 0.35s;
     }
+
+    /* ========================================== */
+    /* INDIKATOR STATUS ONLINE (dot berkedip lembut) */
+    /* ========================================== */
+    /* Sengaja dibuat sendiri (bukan pakai utility animate-ping bawaan Tailwind yang default-nya
+       1 detik & agak "kasar") supaya ritmenya lebih perlahan & lembut — durasi 2.2 detik,
+       ripple melebar sambil memudar, mengulang terus selama toko online. */
+    @keyframes tarobunPresencePing {
+      0%   { transform: scale(1);   opacity: 0.55; }
+      70%  { transform: scale(2.3); opacity: 0; }
+      100% { transform: scale(2.3); opacity: 0; }
+    }
+    .presence-dot-ping {
+      animation: tarobunPresencePing 2.2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+    }
+
+    /* ========================================== */
+    /* TIPOGRAFI DASAR & LAYOUT LEGA (dashboard modern) */
+    /* ========================================== */
+    html { -webkit-text-size-adjust: 100%; }
+    body {
+      line-height: 1.55;
+      letter-spacing: -0.006em;
+      /* Anti-aliasing lebih halus di layar retina/HiDPI, teks kecil dashboard jadi lebih nyaman dibaca */
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+    }
+    h1, h2, h3 { letter-spacing: -0.015em; }
+
+    /* Scrollbar tipis & senada tema (bukan scrollbar default OS yang tebal/kontras) */
+    * { scrollbar-width: thin; scrollbar-color: #C4B5FD transparent; }
+    *::-webkit-scrollbar { width: 8px; height: 8px; }
+    *::-webkit-scrollbar-track { background: transparent; }
+    *::-webkit-scrollbar-thumb { background-color: #C4B5FD; border-radius: 999px; }
+    *::-webkit-scrollbar-thumb:hover { background-color: #A78BFA; }
+
+    /* Warna seleksi teks disesuaikan brand, bukan biru default browser */
+    ::selection { background-color: #DDD6FE; color: #3B1370; }
+
+    /* Focus ring konsisten & jelas terlihat (aksesibilitas keyboard) tanpa outline kotak default
+       yang kaku — dipakai otomatis di semua elemen interaktif. */
+    button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-visible {
+      outline: 2px solid #7C3AED;
+      outline-offset: 2px;
+      border-radius: 4px;
+    }
+
+    /* Micro-interaction global: semua tombol & kartu bertransisi halus saat di-hover/ditekan,
+       tanpa perlu menambahkan className transition di ribuan tempat satu-satu. Efek "tekan"
+       (scale-down tipis) memberi rasa tombol benar-benar merespons sentuhan, terutama di HP. */
+    button, a { transition: transform 0.15s ease, box-shadow 0.15s ease, background-color 0.15s ease, opacity 0.15s ease, filter 0.15s ease; }
+    button:active:not(:disabled) { transform: scale(0.97); }
+    button:disabled { cursor: not-allowed; }
+
+    /* Kartu (rounded-xl/rounded-2xl + border, pola yang dipakai konsisten di seluruh app ini)
+       otomatis "terangkat" lembut saat disentuh kursor — memberi kesan permukaan yang hidup. */
+    .rounded-xl.border, .rounded-2xl.border {
+      transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+    }
+    .rounded-xl.border:hover, .rounded-2xl.border:hover {
+      box-shadow: 0 4px 14px -2px rgba(30, 27, 46, 0.08), 0 16px 32px -12px rgba(30, 27, 46, 0.16);
+    }
+
+    /* Hormati preferensi pengguna yang mematikan animasi (aksesibilitas) — semua animasi custom
+       di atas otomatis dinonaktifkan, bukan cuma yang bawaan Tailwind. */
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after {
+        animation-duration: 0.001ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.001ms !important;
+      }
+    }
+
+    /* ========================================== */
+    /* SKELETON LOADING (pengganti teks "Memuat...") */
+    /* ========================================== */
+    .skeleton {
+      position: relative;
+      overflow: hidden;
+      background-color: #E9E5FB; /* violet-50/100-ish, senada brand, bukan abu-abu generik */
+      border-radius: 8px;
+    }
+    .skeleton::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      transform: translateX(-100%);
+      background: linear-gradient(90deg, transparent, rgba(255,255,255,0.55), transparent);
+      animation: tarobunShimmer 1.6s ease-in-out infinite;
+    }
+    @keyframes tarobunShimmer { 100% { transform: translateX(100%); } }
+
+    /* Panel sidebar (menu hamburger Admin & Toko) masuk dari kiri dengan halus, bukan muncul tiba-tiba */
+    @keyframes tarobunSlideInLeft {
+      from { transform: translateX(-100%); }
+      to   { transform: translateX(0); }
+    }
+    .animate-slideInLeft { animation: tarobunSlideInLeft 0.28s cubic-bezier(0.16, 1, 0.3, 1); }
   </style>
 </head>
 <body class="bg-slate-50 text-slate-800 font-sans">
@@ -219,6 +366,54 @@ const { useState, useEffect } = React;
     }
 
     const db = { ref: dbRef };
+
+    // ==========================================
+    // MEDIA (FOTO) DI R2 — pengganti simpan base64 langsung di database
+    // ==========================================
+    // Ubah data URI base64 (mis. hasil canvas.toDataURL) menjadi Blob biner, supaya bisa
+    // dikirim sebagai body upload (bukan teks JSON raksasa).
+    const dataUrlToBlob = (dataUrl) => {
+      const [header, base64] = String(dataUrl || '').split(',');
+      const mimeMatch = /data:([^;]+);base64/.exec(header || '');
+      const contentType = mimeMatch ? mimeMatch[1] : 'image/jpeg';
+      const binary = atob(base64 || '');
+      const bytes = new Uint8Array(binary.length);
+      for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+      return new Blob([bytes], { type: contentType });
+    };
+
+    // Upload satu blob/foto ke R2 lewat Worker. `folder` dipakai sebagai prefix key (mis.
+    // "wasteFotos/{storeId}") supaya rapi dan gampang ditelusuri. Balikannya { url, key } —
+    // `url` langsung dipakai sebagai <img src>, `key` disimpan di database untuk keperluan hapus nanti.
+    const uploadMediaToR2 = async (dataUrlOrBlob, folder, ext = 'jpg') => {
+      const blob = dataUrlOrBlob instanceof Blob ? dataUrlOrBlob : dataUrlToBlob(dataUrlOrBlob);
+      const res = await fetch(`${WORKER_BASE}/api/media/upload?folder=${encodeURIComponent(folder)}&ext=${encodeURIComponent(ext)}`, {
+        method: 'POST',
+        headers: { 'Content-Type': blob.type || 'application/octet-stream', ...__authHeaders() },
+        body: blob,
+      });
+      if (!res.ok) throw new Error('Gagal upload foto ke storage (HTTP ' + res.status + ')');
+      const data = await res.json();
+      return { key: data.key, url: `${WORKER_BASE}/api/media/file/${data.key}` };
+    };
+
+    // Hapus satu atau beberapa key sekaligus dari R2. Sengaja "best-effort" (tidak melempar error
+    // ke pemanggil) supaya kegagalan hapus file lama tidak sampai mem-block penghapusan data di DB —
+    // file yang gagal terhapus di R2 tidak akan pernah terlihat lagi oleh siapapun karena reference-nya
+    // di database sudah hilang, jadi paling buruk cuma "sampah" kecil, bukan bug yang mengganggu user.
+    const deleteMediaFromR2 = async (keyOrKeys) => {
+      const keys = Array.isArray(keyOrKeys) ? keyOrKeys.filter(Boolean) : [keyOrKeys].filter(Boolean);
+      if (keys.length === 0) return;
+      try {
+        await fetch(`${WORKER_BASE}/api/media/delete`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', ...__authHeaders() },
+          body: JSON.stringify({ keys }),
+        });
+      } catch (e) {
+        console.warn('Gagal hapus file di R2 (diabaikan, tidak mem-block penghapusan data):', e);
+      }
+    };
 
     const __makeUser = (u) => u ? { uid: u.uid || u.storeId, ...u, getIdToken: async () => __sessionToken } : null;
 
@@ -407,6 +602,99 @@ const { useState, useEffect } = React;
     };
 
     // ==========================================
+    // TELEGRAM - HELPER TERPUSAT (PERBAIKAN BUG #4)
+    // ==========================================
+    // Sebelumnya, setiap fitur "Kirim ke Telegram" (laporan penjualan, kedatangan barang, dll)
+    // punya kode fetch() sendiri yang terpisah-pisah, dengan penanganan error yang tidak
+    // konsisten — kalau gagal, hanya muncul pesan generik ("Koneksi bermasalah") tanpa detail
+    // apa pun di console, sehingga sulit diketahui APAKAH penyebabnya token salah, chat ID
+    // salah, format pesan ditolak Telegram, atau jaringan benar-benar putus.
+    //
+    // Fungsi di bawah ini SELALU dibungkus try-catch dan TIDAK PERNAH melempar exception ke
+    // pemanggilnya (tidak akan membuat aplikasi crash / unhandled promise rejection) — semua
+    // kegagalan dikembalikan sebagai `{ ok: false, error }` sekaligus dicatat detailnya ke
+    // console.error, supaya penyebab sebenarnya selalu bisa ditelusuri.
+    const sendTelegramMessage = async (token, chatId, text, options = {}) => {
+      const cleanToken = String(token || '').trim();
+      const cleanChatId = String(chatId || '').trim();
+      if (!cleanToken || !cleanChatId) {
+        const msg = 'Bot Token / Chat ID Telegram belum diatur.';
+        console.error('[Telegram sendMessage] Gagal:', msg);
+        return { ok: false, error: msg };
+      }
+      try {
+        const response = await fetchWithRetry(`https://api.telegram.org/bot${cleanToken}/sendMessage`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ chat_id: cleanChatId, text, parse_mode: options.parseMode || 'Markdown' }),
+        });
+        let result;
+        try {
+          result = await response.json();
+        } catch (parseErr) {
+          throw new Error(`Server Telegram merespons status ${response.status} (bukan format yang dikenali). Kemungkinan Bot Token salah.`);
+        }
+        if (!result.ok) {
+          throw new Error(result.description || `Telegram menolak permintaan (kode ${result.error_code || '-'})`);
+        }
+        return { ok: true, result };
+      } catch (err) {
+        const message = (err instanceof TypeError)
+          ? 'Tidak bisa menghubungi server Telegram (jaringan terputus/diblokir).'
+          : ((err && err.message) || 'Gagal mengirim pesan ke Telegram.');
+        console.error('[Telegram sendMessage] Gagal mengirim laporan. Detail:', err);
+        return { ok: false, error: message };
+      }
+    };
+
+    // Kirim file/dokumen (mis. rekap laporan sebagai file) ke Telegram lewat sendDocument,
+    // dengan try-catch + timeout + logging yang sama ketatnya dengan sendTelegramMessage di atas.
+    const sendTelegramDocument = async (token, chatId, blob, filename, caption) => {
+      const cleanToken = String(token || '').trim();
+      const cleanChatId = String(chatId || '').trim();
+      if (!cleanToken || !cleanChatId) {
+        const msg = 'Bot Token / Chat ID Telegram belum diatur.';
+        console.error('[Telegram sendDocument] Gagal:', msg);
+        return { ok: false, error: msg };
+      }
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 30000);
+      try {
+        const formData = new FormData();
+        formData.append('chat_id', cleanChatId);
+        if (caption) formData.append('caption', caption);
+        formData.append('parse_mode', 'Markdown');
+        formData.append('document', blob, filename || 'laporan.txt');
+        const response = await fetchWithRetry(`https://api.telegram.org/bot${cleanToken}/sendDocument`, {
+          method: 'POST',
+          body: formData,
+          signal: controller.signal,
+        });
+        let result;
+        try {
+          result = await response.json();
+        } catch (parseErr) {
+          throw new Error(`Server Telegram merespons status ${response.status} (bukan format yang dikenali). Cek Bot Token & Chat ID.`);
+        }
+        if (!result.ok) {
+          throw new Error(result.description || `Telegram menolak permintaan (kode ${result.error_code || '-'})`);
+        }
+        return { ok: true, result };
+      } catch (err) {
+        const message = (err && err.name === 'AbortError')
+          ? 'Koneksi terlalu lambat (timeout 30 detik).'
+          : (err instanceof TypeError)
+            ? 'Tidak bisa menghubungi server Telegram (jaringan terputus/diblokir).'
+            : ((err && err.message) || 'Gagal mengirim file ke Telegram.');
+        console.error('[Telegram sendDocument] Gagal mengirim file. Detail:', err);
+        return { ok: false, error: message };
+      } finally {
+        clearTimeout(timeoutId);
+      }
+    };
+
+
+    // ==========================================
     // GANTI WEBSOCKET -> HTTPS BIASA UNTUK SEMUA PEMBACAAN DATA
     // ==========================================
     // db.ref(...).on('value', ...) dan .once('value') dari Firebase SDK memakai koneksi
@@ -548,6 +836,27 @@ const { useState, useEffect } = React;
     const MAX_SOP_IMAGE_STORED_MB = 1.2; // batas ukuran FOTO setelah dikompres
     const MAX_SOP_VIDEO_STORED_MB = 6; // batas ukuran VIDEO setelah dikompres (base64-nya ~8MB, masih aman)
 
+    // Whitelist ekstensi yang diizinkan untuk upload SOP. Dipakai sebagai FALLBACK validasi
+    // ketika `file.type` (MIME type dari browser) kosong/tidak bisa dibaca — kasus ini sering
+    // terjadi pada foto HEIC dari iPhone, atau file yang di-drag-drop dari beberapa file manager,
+    // yang membuat `file.type.startsWith('image/')` bernilai FALSE meski filenya sebenarnya valid.
+    const SOP_ALLOWED_IMAGE_EXT = ['jpg', 'jpeg', 'png', 'webp', 'gif', 'heic', 'heif', 'bmp'];
+    const SOP_ALLOWED_VIDEO_EXT = ['mp4', 'mov', 'webm', 'mkv', '3gp', 'avi'];
+
+    const getFileExtension = (filename) => {
+      const match = /\.([a-zA-Z0-9]+)$/.exec(String(filename || ''));
+      return match ? match[1].toLowerCase() : '';
+    };
+
+    // Bikin nama file unik untuk disimpan, supaya tidak ada bentrok nama antar upload
+    // (mis. dua admin upload file "foto.jpg" di waktu yang berdekatan). Format:
+    // sop_{catId}_{timestamp}_{random}.{ekstensi}
+    const buildUniqueSopFileName = (catId, ext) => {
+      const rand = Math.random().toString(36).slice(2, 8);
+      const safeExt = (ext || 'jpg').replace(/[^a-z0-9]/gi, '').toLowerCase() || 'jpg';
+      return `sop_${catId}_${Date.now()}_${rand}.${safeExt}`;
+    };
+
     // Ubah Blob hasil kompresi menjadi data URI base64 (mis. "data:image/jpeg;base64,...")
     // supaya bisa langsung dipakai sebagai `src` di <img>/<video> tanpa perlu URL eksternal.
     const blobToDataUrl = (blob) => new Promise((resolve, reject) => {
@@ -558,24 +867,51 @@ const { useState, useEffect } = React;
     });
 
     const uploadSopMediaFile = async (catId, file) => {
-      const isImage = file.type.startsWith('image/');
-      const isVideo = file.type.startsWith('video/');
-      if (!isImage && !isVideo) throw new Error('File harus berupa foto atau video.');
+      const ext = getFileExtension(file.name);
+      let isImage = file.type.startsWith('image/');
+      let isVideo = file.type.startsWith('video/');
+
+      // FALLBACK VALIDASI: kalau MIME type dari browser kosong/tidak dikenali (mis. HEIC dari
+      // iPhone, atau beberapa hasil drag-drop), coba tentukan jenis file dari EKSTENSI-nya
+      // sebelum benar-benar menolak upload. Ini yang memperbaiki kasus "tidak bisa upload gambar"
+      // padahal filenya sebenarnya foto yang valid.
+      if (!isImage && !isVideo) {
+        if (SOP_ALLOWED_IMAGE_EXT.includes(ext)) isImage = true;
+        else if (SOP_ALLOWED_VIDEO_EXT.includes(ext)) isVideo = true;
+      }
+
+      if (!isImage && !isVideo) {
+        throw new Error(`Format ".${ext || '?'}" tidak didukung. Gunakan foto (JPG/PNG/WEBP/HEIC) atau video (MP4/MOV/WEBM).`);
+      }
       if (isVideo && file.size > MAX_SOP_VIDEO_MB * 1024 * 1024) {
         throw new Error(`Ukuran video maksimal ${MAX_SOP_VIDEO_MB}MB.`);
       }
       let blob = file;
       let contentType = 'image/jpeg';
       if (isImage) {
-        // Kompres bertahap: kalau hasil kompresi pertama masih kegedean, coba lagi lebih agresif.
-        blob = await compressSopImageFile(file, 1000, 0.7);
-        if (blob.size > MAX_SOP_IMAGE_STORED_MB * 1024 * 1024) {
-          blob = await compressSopImageFile(file, 700, 0.55);
+        try {
+          // Kompres bertahap: kalau hasil kompresi pertama masih kegedean, coba lagi lebih agresif.
+          blob = await compressSopImageFile(file, 1000, 0.7);
+          if (blob.size > MAX_SOP_IMAGE_STORED_MB * 1024 * 1024) {
+            blob = await compressSopImageFile(file, 700, 0.55);
+          }
+          if (blob.size > MAX_SOP_IMAGE_STORED_MB * 1024 * 1024) {
+            throw new Error('Foto masih terlalu besar setelah dikompres. Coba pilih foto lain atau perkecil dulu.');
+          }
+          contentType = 'image/jpeg';
+        } catch (compressErr) {
+          // Beberapa format (mis. HEIC dari iPhone) tidak semua browser bisa membacanya lewat
+          // <img>/<canvas> untuk dikompres. Daripada langsung gagal total, coba kirim file
+          // ASLINYA apa adanya (masih sudah lolos validasi ekstensi di atas), selama ukurannya
+          // masih wajar. Ini yang tadinya bikin admin "tidak bisa menambahkan gambar" untuk
+          // foto tertentu meskipun filenya sah.
+          console.warn('Kompresi foto gagal, coba pakai file asli:', compressErr);
+          if (file.size > MAX_SOP_IMAGE_STORED_MB * 1024 * 1024) {
+            throw new Error('Foto gagal diproses (format tidak didukung browser ini) dan ukurannya terlalu besar untuk diupload langsung. Coba simpan ulang sebagai JPG/PNG lalu upload lagi.');
+          }
+          blob = file;
+          contentType = file.type || 'image/jpeg';
         }
-        if (blob.size > MAX_SOP_IMAGE_STORED_MB * 1024 * 1024) {
-          throw new Error('Foto masih terlalu besar setelah dikompres. Coba pilih foto lain atau perkecil dulu.');
-        }
-        contentType = 'image/jpeg';
       } else {
         contentType = file.type;
         if (isVideoCompressionSupported()) {
@@ -594,14 +930,20 @@ const { useState, useEffect } = React;
           throw new Error(`Video masih ${(blob.size / 1024 / 1024).toFixed(1)}MB setelah dikompres (maks ${MAX_SOP_VIDEO_STORED_MB}MB). Coba rekam video lebih pendek atau resolusi lebih rendah.`);
         }
       }
-      const url = await blobToDataUrl(blob);
-      return { type: isImage ? 'image' : 'video', url, name: file.name, size: blob.size, contentType };
+      // `name` = nama unik yang dipakai sebagai identitas file tersimpan (mencegah bentrok
+      // antar-upload); `originalName` tetap disimpan supaya UI bisa menampilkan nama asli
+      // yang dikenali admin.
+      const storedExt = isImage ? 'jpg' : (getFileExtension(file.name) || 'webm');
+      const uniqueName = buildUniqueSopFileName(catId, storedExt);
+      // Upload ke R2 (bukan disimpan sebagai base64 di database lagi) — `path` = key R2,
+      // dipakai nanti oleh deleteSopMediaFile saat kategori/media ini dihapus.
+      const { url, key } = await uploadMediaToR2(blob, `sopMedia/${catId}`, storedExt);
+      return { type: isImage ? 'image' : 'video', url, path: key, name: uniqueName, originalName: file.name, size: blob.size, contentType };
     };
 
-    // Tidak ada lagi file eksternal di Storage yang perlu dihapus — foto/video tersimpan
-    // sebagai data langsung di dalam node media itu sendiri, jadi otomatis ikut terhapus
-    // begitu node sopCategories/{catId}/media/{mediaId} dihapus dari database.
-    const deleteSopMediaFile = async () => {};
+    // Hapus file SOP dari R2. `path` = R2 key yang tersimpan di field `path` pada tiap item media
+    // (lihat uploadSopMediaFile). Best-effort lewat deleteMediaFromR2, tidak mem-block hapus data DB.
+    const deleteSopMediaFile = async (path) => deleteMediaFromR2(path);
 
     // ==========================================
     // AUTO-HAPUS DATA LAMA (>30 HARI) & NOTIFIKASI BROWSER
@@ -610,21 +952,29 @@ const { useState, useEffect } = React;
 
     // Hapus entri pada sebuah Firebase ref yang usianya sudah lebih dari 30 hari.
     // getTimestamp(item, key) harus mengembalikan angka epoch ms dari entri tsb (return 0/null = tidak pernah dihapus otomatis).
-    const pruneOldEntries = async (ref, getTimestamp) => {
+    // getMediaKeys(item, key) OPSIONAL — kalau diisi, harus mengembalikan array key R2 (atau kosong)
+    // yang menempel di entri tsb, supaya file fotonya ikut dihapus dari R2 dan tidak jadi sampah
+    // menumpuk di storage walau baris databasenya sudah bersih.
+    const pruneOldEntries = async (ref, getTimestamp, getMediaKeys) => {
       try {
         const snap = await ref.once('value');
         const data = snap.val();
         if (!data) return 0;
         const now = Date.now();
         const updates = {};
+        const mediaKeysToDelete = [];
         Object.keys(data).forEach((key) => {
           const ts = getTimestamp(data[key], key);
           if (ts && (now - ts) > DATA_RETENTION_MS) {
             updates[key] = null; // null pada multi-path update Firebase = hapus key tsb
+            if (getMediaKeys) mediaKeysToDelete.push(...(getMediaKeys(data[key], key) || []));
           }
         });
         const staleCount = Object.keys(updates).length;
-        if (staleCount > 0) await ref.update(updates);
+        if (staleCount > 0) {
+          await ref.update(updates);
+          if (mediaKeysToDelete.length > 0) await deleteMediaFromR2(mediaKeysToDelete);
+        }
         return staleCount;
       } catch (err) {
         console.error('Gagal membersihkan data lama:', err);
@@ -734,8 +1084,8 @@ const { useState, useEffect } = React;
       const step = steps[idx];
       const isLast = idx === steps.length - 1;
       return (
-        <div className="fixed inset-0 z-[100] bg-black/60 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl max-w-sm w-full p-6 shadow-2xl">
+        <div className="fixed inset-0 z-[100] bg-black/60 flex items-center justify-center p-4 animate-fadeIn">
+          <div className="bg-white rounded-2xl animate-scaleIn max-w-sm w-full p-6 shadow-2xl">
             <div className="w-12 h-12 rounded-xl bg-purple-100 text-purple-700 flex items-center justify-center mb-4">
               <i data-lucide={step.icon} className="w-6 h-6"></i>
             </div>
@@ -795,7 +1145,7 @@ const { useState, useEffect } = React;
             className="tarobun-splash-logo w-28 h-28 sm:w-32 sm:h-32 rounded-3xl shadow-2xl object-contain bg-white/5"
           />
           <div className="tarobun-splash-text mt-5 text-center">
-            <h1 className="text-white font-bold text-lg tracking-wide">TAROBUN Green Pramuka Hub</h1>
+            <h1 className="text-white font-display font-extrabold text-lg tracking-wide">TAROBUN Green Pramuka Hub</h1>
             <p className="text-purple-200 text-xs mt-1">Memuat aplikasi...</p>
           </div>
         </div>
@@ -882,10 +1232,11 @@ const { useState, useEffect } = React;
         };
 
         const tryAdminCheck = (n) => {
-          db.ref('meta/adminAccountExists').once('value')
-            .then(snap => {
+          fetch(`${WORKER_BASE}/api/admin-exists`)
+            .then(res => { if (!res.ok) throw new Error('admin-exists gagal'); return res.json(); })
+            .then(data => {
               if (cancelled) return;
-              const exists = snap.val() === true;
+              const exists = data.exists === true;
               setAdminExists(exists);
               try { localStorage.setItem('tarobun_admin_exists_cache', JSON.stringify(exists)); } catch (e) {}
             })
@@ -1002,7 +1353,17 @@ const { useState, useEffect } = React;
           onLoggedIn({ role: 'admin' });
         } catch (err) {
           registerFailedAttempt(key);
-          setError(adminExists === false ? 'Gagal membuat akun admin.' : 'Password admin salah.');
+          if (adminExists === false && /sudah/i.test(err.message || '')) {
+            // Server bilang admin sebenarnya sudah ada (flag di sisi ini sempat tidak sinkron,
+            // dan sudah otomatis dibetulkan oleh server barusan) — langsung alihkan ke form Login
+            // supaya pengguna tidak bingung dan tidak coba "buat akun" berulang-ulang.
+            setAdminExists(true);
+            setAdminPassword('');
+            setAdminPassword2('');
+            setError('Akun admin sudah pernah dibuat sebelumnya. Silakan masukkan password admin untuk login.');
+          } else {
+            setError(adminExists === false ? 'Gagal membuat akun admin.' : 'Password admin salah.');
+          }
         } finally {
           setLoading(false);
         }
@@ -1017,7 +1378,7 @@ const { useState, useEffect } = React;
                 alt="Logo Tarobun"
                 className="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl object-contain shadow-md mb-3"
               />
-              <h1 className="font-bold text-slate-800 text-lg">TAROBUN Green Pramuka Hub</h1>
+              <h1 className="font-display font-extrabold text-slate-800 text-lg">TAROBUN Green Pramuka Hub</h1>
               <p className="text-xs text-slate-600 text-center mt-1">Masuk sebagai toko atau admin pusat</p>
             </div>
 
@@ -1096,6 +1457,48 @@ const { useState, useEffect } = React;
     // ==========================================
     // PANEL ADMIN
     // ==========================================
+    // Titik indikator status online toko — dipakai di berbagai tempat (kartu daftar toko, chat,
+    // modal detail, monitor kehadiran). Kalau online: titik hijau solid + ripple "ping" melebar-
+    // memudar lembut & perlahan di belakangnya. Kalau offline: titik abu-abu diam saja (animasi
+    // untuk status mati justru membingungkan, jadi sengaja tidak dianimasikan).
+    function PresenceDot({ isOnline, size = 'w-2.5 h-2.5' }) {
+      return (
+        <span className={`relative inline-flex ${size} shrink-0`}>
+          {isOnline && (
+            <span className={`presence-dot-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400`}></span>
+          )}
+          <span className={`relative inline-flex rounded-full ${size} ${isOnline ? 'bg-emerald-500' : 'bg-slate-300'}`}></span>
+        </span>
+      );
+    }
+
+    // Blok skeleton shimmer generik — pengganti teks "Memuat..." polos. `className` menentukan
+    // ukuran/bentuknya (mis. "h-4 w-24" utk baris teks, "h-20 w-20 rounded-full" utk avatar).
+    function Skeleton({ className = '' }) {
+      return <div className={`skeleton ${className}`}></div>;
+    }
+
+    // Skeleton khusus bentuk "Modal Detail Toko" — meniru kerangka konten aslinya (kredensial,
+    // ringkasan angka, daftar laporan) supaya transisi loading→data terasa mulus, bukan lompatan
+    // dari teks "Memuat..." ke layout yang sama sekali berbeda.
+    function StoreDetailSkeleton() {
+      return (
+        <div className="space-y-6 animate-fadeIn">
+          <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 space-y-3">
+            <Skeleton className="h-4 w-40" />
+            <Skeleton className="h-9 w-full" />
+          </div>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+            {[0, 1, 2, 3].map(i => <Skeleton key={i} className="h-16 w-full" />)}
+          </div>
+          <div className="space-y-2">
+            <Skeleton className="h-4 w-32" />
+            {[0, 1, 2].map(i => <Skeleton key={i} className="h-10 w-full" />)}
+          </div>
+        </div>
+      );
+    }
+
     function AdminPanel({ onLogout }) {
       const [tab, setTab] = useState('stores');
       const [showMenu, setShowMenu] = useState(false);
@@ -1141,6 +1544,17 @@ const { useState, useEffect } = React;
       // ==========================================
       const [confirmDeleteOldReports, setConfirmDeleteOldReports] = useState(false);
       const [deletingOldReports, setDeletingOldReports] = useState(false);
+
+      // ==========================================
+      // PENGHAPUSAN 1 LAPORAN / 1 FOTO SECARA INDIVIDUAL (STATE)
+      // ==========================================
+      const [confirmDeleteReport, setConfirmDeleteReport] = useState(null); // { id, tanggal }
+      const [deletingReportId, setDeletingReportId] = useState(null);
+      const [confirmDeleteWasteFoto, setConfirmDeleteWasteFoto] = useState(null); // { firebaseKey, fotoKey, kategori }
+      const [deletingWasteFotoKey, setDeletingWasteFotoKey] = useState(null);
+      // Label ringkas kategori waste, dipakai HANYA untuk teks modal konfirmasi hapus di Panel
+      // Admin (bukan WASTE_CATEGORIES yang ada di komponen Toko — beda komponen, beda scope).
+      const ADMIN_WASTE_LABELS = { bunRijek: 'Bun Rijek', rijekBarang: 'Rijek Barang', bunWaste: 'Bun Waste' };
 
       // ==========================================
       // PANDUAN SOP - STATE & LOGIKA (Sisi Admin)
@@ -1462,7 +1876,7 @@ const { useState, useEffect } = React;
         };
         const wasteHandler = (snap) => {
           const data = snap.val() || {};
-          wasteList = Object.values(data).sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+          wasteList = Object.keys(data).map(key => ({ firebaseKey: key, ...data[key] })).sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
           gotWaste = true;
           pushUpdate();
         };
@@ -1489,9 +1903,9 @@ const { useState, useEffect } = React;
         stores.forEach((store) => {
           const base = `stores/${store.id}`;
           pruneOldEntries(db.ref(`${base}/history`), (item) => item.tanggal ? new Date(item.tanggal).getTime() : (item.createdAt || 0));
-          pruneOldEntries(db.ref(`${base}/wasteFotos`), (item) => item.createdAt || (item.tanggal ? new Date(item.tanggal).getTime() : 0));
+          pruneOldEntries(db.ref(`${base}/wasteFotos`), (item) => item.createdAt || (item.tanggal ? new Date(item.tanggal).getTime() : 0), (item) => item.fotoKey ? [item.fotoKey] : []);
           pruneOldEntries(db.ref(`${base}/kedatanganBarang`), (item) => item.createdAt || (item.tanggal ? new Date(item.tanggal).getTime() : 0));
-          pruneOldEntries(db.ref(`${base}/suhuReports`), (item) => item.createdAt || (item.tanggal ? new Date(item.tanggal).getTime() : 0));
+          pruneOldEntries(db.ref(`${base}/suhuReports`), (item) => item.createdAt || (item.tanggal ? new Date(item.tanggal).getTime() : 0), (item) => (item.fotos || []).map(f => f.fotoKey).filter(Boolean));
           pruneOldEntries(db.ref(`chats/${store.id}/messages`), (item) => item.timestamp || 0);
         });
       }, [stores.length]);
@@ -1648,13 +2062,14 @@ const { useState, useEffect } = React;
               continue;
             }
             const text = `*📢 UPDATE SISTEM WEB TAROBUN*\n\n${escapeMdWebUpdate(message)}`;
-            const response = await fetchWithRetry(`https://api.telegram.org/bot${token}/sendMessage`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ chat_id: chatId, text, parse_mode: 'Markdown' }),
-            });
-            if (response.ok) success.push(store.name);
-            else failed.push(store.name);
+            // PERBAIKAN: kode lama mengecek `response.ok` (status HTTP fetch), padahal Telegram
+            // API sering membalas HTTP 200 tetap tapi dengan body `{ ok: false, description }`
+            // untuk kasus gagal (mis. bot diblokir user, chat_id salah). Akibatnya pengiriman yang
+            // sebenarnya DITOLAK Telegram tetap tercatat "berhasil". Sekarang pakai helper terpusat
+            // yang benar-benar memeriksa `result.ok` dari body JSON Telegram.
+            const res = await sendTelegramMessage(token, chatId, text);
+            if (res.ok) success.push(store.name);
+            else failed.push(`${store.name} (${res.error})`);
           } catch (err) {
             console.error('Gagal kirim Update Web ke toko:', store.name, err);
             failed.push(store.name);
@@ -1662,15 +2077,15 @@ const { useState, useEffect } = React;
         }
         setWebUpdateReport({ success, failed });
 
-        // Simpan juga ke Firebase agar semua Toko yang online menerima pop-up real-time
+        // Simpan juga ke database agar semua Toko yang online menerima pop-up real-time
         try {
           await restSet(db.ref('systemUpdates/latest'), {
             id: Date.now().toString(),
             text: message,
-            timestamp: firebase.database.ServerValue.TIMESTAMP
+            timestamp: Date.now()
           });
         } catch (err) {
-          console.error('Gagal menyimpan Update Web ke Firebase:', err);
+          console.error('Gagal menyimpan Update Web ke database:', err);
         }
 
         setSendingWebUpdate(false);
@@ -1730,24 +2145,77 @@ const { useState, useEffect } = React;
         }
       };
 
-      // Ganti token login toko. Karena token lama tersimpan (info.token), admin bisa re-autentikasi
-      // sebagai akun toko tersebut lewat instance auth kedua, lalu mengganti passwordnya.
+      // Hapus SATU laporan penjualan/stok tertentu (bukan massal ≥7 hari). Laporan ini tidak
+      // menyimpan foto (hanya angka penjualan/stok), jadi cukup hapus baris DB-nya saja.
+      const handleDeleteSingleReport = async () => {
+        if (!detailStore || !confirmDeleteReport) return;
+        setDeletingReportId(confirmDeleteReport.id);
+        try {
+          await restRemove(db.ref(`stores/${detailStore.id}/history/${confirmDeleteReport.id}`));
+          setConfirmDeleteReport(null);
+          showAdminToast(`🗑️ Laporan tanggal ${confirmDeleteReport.tanggal} berhasil dihapus.`);
+        } catch (err) {
+          console.error('Gagal menghapus laporan:', err);
+          alert('Gagal menghapus laporan: periksa koneksi internet Anda.');
+        } finally {
+          setDeletingReportId(null);
+        }
+      };
+
+      // Hapus SATU foto Rijek/Waste — foto aslinya tersimpan di R2 (bukan base64 di database),
+      // jadi selain hapus baris DB, file di R2 juga ikut dihapus permanen lewat fotoKey supaya
+      // storage tidak menumpuk sampah foto yang sudah tidak ada reference-nya di database.
+      const handleDeleteWasteFoto = async () => {
+        if (!detailStore || !confirmDeleteWasteFoto) return;
+        setDeletingWasteFotoKey(confirmDeleteWasteFoto.firebaseKey);
+        try {
+          await restRemove(db.ref(`stores/${detailStore.id}/wasteFotos/${confirmDeleteWasteFoto.firebaseKey}`));
+          if (confirmDeleteWasteFoto.fotoKey) await deleteMediaFromR2(confirmDeleteWasteFoto.fotoKey);
+          setConfirmDeleteWasteFoto(null);
+          showAdminToast('🗑️ Foto berhasil dihapus permanen.');
+        } catch (err) {
+          console.error('Gagal menghapus foto:', err);
+          alert('Gagal menghapus foto: periksa koneksi internet Anda.');
+        } finally {
+          setDeletingWasteFotoKey(null);
+        }
+      };
+
+      // Ganti token login toko.
+      // CATATAN PERBAIKAN BUG: kode lama mencoba re-autentikasi ke Firebase Auth lewat
+      // `secondaryAuth.signInWithEmailAndPassword(...)` lalu `cred.user.updatePassword(...)`.
+      // Ini SISA kode dari sebelum migrasi ke Cloudflare Worker — `secondaryAuth` sekarang
+      // cuma stub ringan yang CUMA punya `createUserWithEmailAndPassword` & `signOut`
+      // (lihat definisinya di atas), sehingga `signInWithEmailAndPassword` selalu
+      // menghasilkan TypeError ("... is not a function") dan proses reset gagal total
+      // sebelum sempat menyentuh database sama sekali.
+      //
+      // Sejak migrasi, token toko TIDAK lagi disimpan lewat Firebase Auth — token hanya
+      // field data biasa di `stores/{id}/info/token` (persis seperti saat toko baru dibuat
+      // di `handleAddStore`). Jadi reset token cukup: generate token baru lalu update
+      // langsung ke database via Worker, tanpa perlu "login ulang" sama sekali.
       const handleRegenerateToken = async (store) => {
+        if (!store || !store.id) {
+          console.error('handleRegenerateToken dipanggil tanpa data toko yang valid:', store);
+          setRegeneratedToken('ERROR');
+          return;
+        }
         setRegeneratingToken(true);
         setRegeneratedToken(null);
         try {
-          const email = storeIdToEmail(store.id);
-          const oldToken = store.token;
-          if (!oldToken) throw new Error('Token lama tidak ditemukan, tidak bisa diganti otomatis.');
           const newToken = generateSecureToken(16);
-          const cred = await secondaryAuth.signInWithEmailAndPassword(email, oldToken);
-          await cred.user.updatePassword(newToken);
-          await secondaryAuth.signOut();
+
+          // Update ke Cloudflare Worker (Realtime Database). Kalau request ini gagal
+          // (network/HTTP error), restSet akan melempar error dan ditangkap di catch,
+          // sehingga token LAMA tetap berlaku (tidak ada state "setengah update").
           await restSet(db.ref(`stores/${store.id}/info/token`), newToken);
+
+          // Baru setelah database dipastikan ter-update, perbarui tampilan di sisi client.
           setRegeneratedToken(newToken);
-          setDetailStore(prev => prev ? { ...prev, token: newToken } : prev);
+          setDetailStore(prev => (prev && prev.id === store.id) ? { ...prev, token: newToken } : prev);
+          setStores(prev => prev.map(s => s.id === store.id ? { ...s, token: newToken } : s));
         } catch (err) {
-          console.error(err);
+          console.error('Gagal mereset token toko "' + store.id + '":', err);
           setRegeneratedToken('ERROR');
         } finally {
           setRegeneratingToken(false);
@@ -1813,7 +2281,7 @@ const { useState, useEffect } = React;
                 </button>
                 <div className="bg-white text-indigo-900 w-8 h-8 rounded-full font-bold flex items-center justify-center text-md tracking-wider shrink-0">A</div>
                 <div className="min-w-0">
-                  <h1 className="font-bold text-sm md:text-base tracking-wide truncate">Panel Admin TAROBUN</h1>
+                  <h1 className="font-display font-extrabold text-sm md:text-base tracking-wide truncate">Panel Admin TAROBUN</h1>
                   <p className="text-[10px] text-purple-200 truncate">Kelola seluruh cabang toko</p>
                 </div>
               </div>
@@ -1834,17 +2302,17 @@ const { useState, useEffect } = React;
           {showMenu && (
             <div className="fixed inset-0 z-40 flex">
               {/* Overlay */}
-              <div className="fixed inset-0 bg-black/50" onClick={() => setShowMenu(false)}></div>
+              <div className="fixed inset-0 bg-black/50 animate-fadeIn" onClick={() => setShowMenu(false)}></div>
 
               {/* Panel */}
-              <div className="relative bg-white w-72 max-w-[80%] h-full shadow-xl flex flex-col">
+              <div className="relative bg-white w-72 max-w-[80%] h-full shadow-xl flex flex-col animate-slideInLeft">
                 <div className="bg-gradient-to-r from-indigo-900 to-purple-900 text-white px-4 py-4 flex items-center justify-between">
                   <div className="flex items-center space-x-2">
                     <div className="bg-white text-indigo-900 w-8 h-8 rounded-full font-bold flex items-center justify-center text-md tracking-wider">
                       A
                     </div>
                     <div>
-                      <h2 className="font-bold text-sm tracking-wide">Panel Admin</h2>
+                      <h2 className="font-display font-extrabold text-sm tracking-wide">Panel Admin</h2>
                       <p className="text-[10px] text-purple-200">Menu Navigasi</p>
                     </div>
                   </div>
@@ -1942,7 +2410,7 @@ const { useState, useEffect } = React;
                       return (
                         <div key={store.id} className="flex items-center justify-between py-1.5 border-b border-slate-100 last:border-0">
                           <div className="flex items-center gap-2 min-w-0">
-                            <span className={`w-2.5 h-2.5 rounded-full shrink-0 ${isOnline ? 'bg-emerald-500' : 'bg-rose-500'}`}></span>
+                            <PresenceDot isOnline={isOnline} />
                             <span className="text-sm font-semibold text-slate-700 truncate">{store.name}</span>
                           </div>
                           <span className="text-[10px] text-slate-600 shrink-0 ml-2">
@@ -1971,7 +2439,10 @@ const { useState, useEffect } = React;
                     <div key={store.id} className={`bg-white rounded-xl border p-4 shadow-sm ${store.active === false ? 'opacity-50 border-slate-200' : 'border-slate-200'}`}>
                       <div className="flex items-start justify-between gap-2 mb-2">
                         <div className="min-w-0">
-                          <h3 className="font-bold text-slate-800 text-sm truncate">{store.name}</h3>
+                          <h3 className="font-bold text-slate-800 text-sm truncate flex items-center gap-1.5">
+                            <PresenceDot isOnline={isStoreOnline(storesPresence[store.id])} />
+                            <span className="truncate">{store.name}</span>
+                          </h3>
                           <p className="text-[10px] text-slate-600">Dibuat: {store.createdAt ? new Date(store.createdAt).toLocaleDateString('id-ID') : '-'}</p>
                           {store.active === false && <span className="inline-block mt-1 text-[9px] font-bold text-rose-600 bg-rose-50 px-1.5 py-0.5 rounded">NONAKTIF</span>}
                         </div>
@@ -2246,7 +2717,7 @@ const { useState, useEffect } = React;
                             {cat.media.map(m => (
                               <div key={m.id} className="relative group aspect-square bg-slate-100 rounded-lg overflow-hidden">
                                 {m.type === 'image' ? (
-                                  <img src={m.url} alt={m.name} className="w-full h-full object-cover" />
+                                  <img src={m.url} alt={m.originalName || m.name} className="w-full h-full object-cover" />
                                 ) : (
                                   <video src={m.url} className="w-full h-full object-cover" muted></video>
                                 )}
@@ -2275,7 +2746,10 @@ const { useState, useEffect } = React;
                   <h3 className="font-bold text-slate-700 text-sm px-2 pb-2 border-b border-slate-100 mb-2">Pilih Toko</h3>
                   {stores.map(store => (
                     <button key={store.id} onClick={() => openChatWithStore(store)} className={`w-full flex items-center justify-between text-left px-3 py-2 rounded-lg text-sm font-semibold mb-1 ${activeChatStore?.id === store.id ? 'bg-purple-50 text-purple-800' : 'text-slate-600 hover:bg-slate-50'}`}>
-                      <span className="truncate">{store.name}</span>
+                      <span className="flex items-center gap-1.5 min-w-0">
+                        <PresenceDot isOnline={isStoreOnline(storesPresence[store.id])} size="w-2 h-2" />
+                        <span className="truncate">{store.name}</span>
+                      </span>
                       {unreadByStore[store.id] > 0 && (
                         <span className="ml-2 shrink-0 bg-rose-100 text-rose-700 text-[10px] font-bold px-1.5 py-0.5 rounded-md">{unreadByStore[store.id]}</span>
                       )}
@@ -2362,8 +2836,8 @@ const { useState, useEffect } = React;
 
           {/* Modal Tambah Toko */}
           {showAdd && (
-            <div className="fixed inset-0 z-[90] bg-black/50 flex items-center justify-center p-4">
-              <div className="bg-white rounded-2xl w-full max-w-sm p-6">
+            <div className="fixed inset-0 z-[90] bg-black/50 flex items-center justify-center p-4 animate-fadeIn">
+              <div className="bg-white rounded-2xl animate-scaleIn w-full max-w-sm p-6">
                 <h3 className="font-bold text-slate-800 mb-4">Tambah Cabang Toko</h3>
                 <form onSubmit={handleAddStore} className="space-y-4">
                   <div>
@@ -2381,8 +2855,8 @@ const { useState, useEffect } = React;
 
           {/* Modal Token Baru (tampil sekali) */}
           {createdToken && (
-            <div className="fixed inset-0 z-[90] bg-black/50 flex items-center justify-center p-4">
-              <div className="bg-white rounded-2xl w-full max-w-sm p-6">
+            <div className="fixed inset-0 z-[90] bg-black/50 flex items-center justify-center p-4 animate-fadeIn">
+              <div className="bg-white rounded-2xl animate-scaleIn w-full max-w-sm p-6">
                 <div className="flex items-center gap-2 mb-3 text-emerald-600">
                   <i data-lucide="check-circle" className="w-5 h-5"></i>
                   <h3 className="font-bold text-slate-800">Toko "{createdToken.name}" Dibuat!</h3>
@@ -2404,8 +2878,8 @@ const { useState, useEffect } = React;
 
           {/* Modal Konfirmasi Hapus */}
           {confirmDelete && (
-            <div className="fixed inset-0 z-[90] bg-black/50 flex items-center justify-center p-4">
-              <div className="bg-white rounded-2xl w-full max-w-sm p-6">
+            <div className="fixed inset-0 z-[90] bg-black/50 flex items-center justify-center p-4 animate-fadeIn">
+              <div className="bg-white rounded-2xl animate-scaleIn w-full max-w-sm p-6">
                 <h3 className="font-bold text-slate-800 mb-2">Hapus Toko?</h3>
                 <p className="text-xs text-slate-500 mb-4">Semua data toko "{confirmDelete.name}" (riwayat, stok, foto, chat) akan dihapus permanen dan akses login toko ini langsung dicabut. Tindakan ini tidak bisa dibatalkan.</p>
                 <div className="flex gap-2">
@@ -2418,8 +2892,8 @@ const { useState, useEffect } = React;
 
           {/* Modal Konfirmasi Hapus Kategori SOP */}
           {confirmDeleteSop && (
-            <div className="fixed inset-0 z-[90] bg-black/50 flex items-center justify-center p-4">
-              <div className="bg-white rounded-2xl w-full max-w-sm p-6">
+            <div className="fixed inset-0 z-[90] bg-black/50 flex items-center justify-center p-4 animate-fadeIn">
+              <div className="bg-white rounded-2xl animate-scaleIn w-full max-w-sm p-6">
                 <h3 className="font-bold text-slate-800 mb-2">Hapus Kategori SOP?</h3>
                 <p className="text-xs text-slate-500 mb-4">Kategori "{confirmDeleteSop.name}" beserta seluruh foto/video di dalamnya akan dihapus permanen dan tidak akan muncul lagi di aplikasi toko. Tindakan ini tidak bisa dibatalkan.</p>
                 <div className="flex gap-2">
@@ -2432,8 +2906,8 @@ const { useState, useEffect } = React;
 
           {/* Modal Konfirmasi Hapus Laporan >=7 Hari */}
           {confirmDeleteOldReports && detailStore && detailData && (
-            <div className="fixed inset-0 z-[95] bg-black/50 flex items-center justify-center p-4">
-              <div className="bg-white rounded-2xl w-full max-w-sm p-6">
+            <div className="fixed inset-0 z-[95] bg-black/50 flex items-center justify-center p-4 animate-fadeIn">
+              <div className="bg-white rounded-2xl animate-scaleIn w-full max-w-sm p-6">
                 <h3 className="font-bold text-slate-800 mb-2">Hapus Laporan Lama?</h3>
                 <p className="text-xs text-slate-500 mb-4">
                   {getOldReportEntries(detailData.historyList).length} laporan penjualan & stok toko "{detailStore.name}" yang usianya sudah <b>7 hari atau lebih</b> akan dihapus permanen. Toko "{detailStore.name}" akan otomatis mendapat notifikasi lewat Chat bahwa laporan lamanya telah dibersihkan. Tindakan ini tidak bisa dibatalkan.
@@ -2446,16 +2920,54 @@ const { useState, useEffect } = React;
             </div>
           )}
 
+          {/* Modal Konfirmasi Hapus 1 Laporan */}
+          {confirmDeleteReport && detailStore && (
+            <div className="fixed inset-0 z-[96] bg-black/50 flex items-center justify-center p-4 animate-fadeIn">
+              <div className="bg-white rounded-2xl animate-scaleIn w-full max-w-sm p-6">
+                <h3 className="font-bold text-slate-800 mb-2">Hapus Laporan Ini?</h3>
+                <p className="text-xs text-slate-500 mb-4">
+                  Laporan penjualan & stok toko "{detailStore.name}" tanggal <b>{confirmDeleteReport.tanggal}</b> akan dihapus permanen. Tindakan ini tidak bisa dibatalkan.
+                </p>
+                <div className="flex gap-2">
+                  <button onClick={() => setConfirmDeleteReport(null)} className="flex-1 bg-slate-100 text-slate-600 font-bold py-2.5 rounded-xl text-sm">Batal</button>
+                  <button onClick={handleDeleteSingleReport} disabled={!!deletingReportId} className="flex-1 bg-rose-600 disabled:opacity-50 text-white font-bold py-2.5 rounded-xl text-sm">{deletingReportId ? 'Menghapus...' : 'Ya, Hapus'}</button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Modal Konfirmasi Hapus 1 Foto Rijek/Waste */}
+          {confirmDeleteWasteFoto && detailStore && (
+            <div className="fixed inset-0 z-[96] bg-black/50 flex items-center justify-center p-4 animate-fadeIn">
+              <div className="bg-white rounded-2xl animate-scaleIn w-full max-w-sm p-6">
+                <h3 className="font-bold text-slate-800 mb-2">Hapus Foto Ini?</h3>
+                <p className="text-xs text-slate-500 mb-4">
+                  Foto {ADMIN_WASTE_LABELS[confirmDeleteWasteFoto.kategori] || 'Rijek/Waste'} toko "{detailStore.name}" akan dihapus permanen dari database maupun storage. Tindakan ini tidak bisa dibatalkan.
+                </p>
+                <div className="flex gap-2">
+                  <button onClick={() => setConfirmDeleteWasteFoto(null)} className="flex-1 bg-slate-100 text-slate-600 font-bold py-2.5 rounded-xl text-sm">Batal</button>
+                  <button onClick={handleDeleteWasteFoto} disabled={!!deletingWasteFotoKey} className="flex-1 bg-rose-600 disabled:opacity-50 text-white font-bold py-2.5 rounded-xl text-sm">{deletingWasteFotoKey ? 'Menghapus...' : 'Ya, Hapus'}</button>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Modal Detail Toko */}
           {detailStore && (
-            <div className="fixed inset-0 z-[90] bg-black/50 flex items-center justify-center p-4">
-              <div className="bg-white rounded-2xl w-full max-w-2xl max-h-[85vh] overflow-y-auto p-6">
+            <div className="fixed inset-0 z-[90] bg-black/50 flex items-center justify-center p-4 animate-fadeIn">
+              <div className="bg-white rounded-2xl animate-scaleIn w-full max-w-2xl max-h-[85vh] overflow-y-auto p-6">
                 <div className="flex justify-between items-center mb-4 pb-3 border-b border-slate-100">
-                  <h3 className="font-bold text-slate-800 text-lg">{detailStore.name}</h3>
+                  <h3 className="font-bold text-slate-800 text-lg flex items-center gap-2">
+                    <PresenceDot isOnline={isStoreOnline(storesPresence[detailStore.id])} size="w-3 h-3" />
+                    <span>{detailStore.name}</span>
+                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${isStoreOnline(storesPresence[detailStore.id]) ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-500'}`}>
+                      {isStoreOnline(storesPresence[detailStore.id]) ? 'Sedang dibuka' : 'Offline'}
+                    </span>
+                  </h3>
                   <button onClick={() => setDetailStore(null)} className="text-slate-600 hover:text-slate-600"><i data-lucide="x" className="w-5 h-5"></i></button>
                 </div>
                 {detailLoading ? (
-                  <p className="text-sm text-slate-600 text-center py-10">Memuat data...</p>
+                  <StoreDetailSkeleton />
                 ) : detailData ? (
                   <div className="space-y-6">
                     <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 space-y-3">
@@ -2520,9 +3032,18 @@ const { useState, useEffect } = React;
                         <div className="divide-y divide-slate-100 max-h-56 overflow-y-auto border border-slate-100 rounded-xl">
                           {detailData.historyList.map((h, i) => (
                             <details key={i} className="p-3">
-                              <summary className="cursor-pointer text-xs font-bold text-slate-700 flex justify-between">
+                              <summary className="cursor-pointer text-xs font-bold text-slate-700 flex justify-between items-center gap-2">
                                 <span>{h.tanggal}</span>
-                                <span>Rp {(h.revenue || 0).toLocaleString('id-ID')} • {h.totalSales || 0} pcs</span>
+                                <span className="flex items-center gap-2">
+                                  <span>Rp {(h.revenue || 0).toLocaleString('id-ID')} • {h.totalSales || 0} pcs</span>
+                                  <button
+                                    onClick={(e) => { e.preventDefault(); e.stopPropagation(); setConfirmDeleteReport({ id: h.id, tanggal: h.tanggal }); }}
+                                    className="shrink-0 p-1.5 text-rose-500 hover:bg-rose-50 rounded-lg"
+                                    title="Hapus laporan ini"
+                                  >
+                                    <i data-lucide="trash-2" className="w-3.5 h-3.5"></i>
+                                  </button>
+                                </span>
                               </summary>
                               {h.inventory && (
                                 <div className="mt-2 grid grid-cols-2 sm:grid-cols-3 gap-1 text-[10px] text-slate-500">
@@ -2552,7 +3073,16 @@ const { useState, useEffect } = React;
                       ) : (
                         <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
                           {detailData.wasteList.slice(0, 12).map((w, i) => (
-                            <img key={i} src={w.foto} className="w-full h-20 object-cover rounded-lg border border-slate-200" />
+                            <div key={i} className="relative group">
+                              <img src={w.foto} className="w-full h-20 object-cover rounded-lg border border-slate-200" />
+                              <button
+                                onClick={() => setConfirmDeleteWasteFoto({ firebaseKey: w.firebaseKey, fotoKey: w.fotoKey, kategori: w.kategori })}
+                                className="absolute top-1 right-1 p-1 bg-white/90 text-rose-600 rounded-lg shadow border border-rose-100 hover:bg-rose-50"
+                                title="Hapus foto ini"
+                              >
+                                <i data-lucide="trash-2" className="w-3 h-3"></i>
+                              </button>
+                            </div>
                           ))}
                         </div>
                       )}
@@ -2716,6 +3246,27 @@ const { useState, useEffect } = React;
         setShowOnboarding(false);
       };
       const [unreadChat, setUnreadChat] = useState(0);
+
+      // ==========================================
+      // STATUS KONEKSI JARINGAN (sisi Toko)
+      // ==========================================
+      // navigator.onLine dibaca browser dari status adapter jaringan HP/laptop (WiFi/data
+      // seluler nyala atau tidak) — instan & tanpa perlu request apapun ke server, jadi paling
+      // ringan untuk hal ini. Event 'online'/'offline' otomatis dipicu browser begitu status
+      // berubah, sehingga badge di header selalu akurat real-time tanpa polling tambahan.
+      // (Ini beda dari "presence" di atas yang melacak status LOGIN toko untuk dilihat Admin;
+      // yang ini murni indikator lokal untuk toko sendiri melihat koneksi internetnya sendiri.)
+      const [isNetworkOnline, setIsNetworkOnline] = useState(navigator.onLine);
+      useEffect(() => {
+        const goOnline = () => setIsNetworkOnline(true);
+        const goOffline = () => setIsNetworkOnline(false);
+        window.addEventListener('online', goOnline);
+        window.addEventListener('offline', goOffline);
+        return () => {
+          window.removeEventListener('online', goOnline);
+          window.removeEventListener('offline', goOffline);
+        };
+      }, []);
 
       // ==========================================
       // REAL-TIME PRESENCE: status online/offline toko
@@ -3178,9 +3729,9 @@ useEffect(() => {
       // Dijalankan sekali tiap dashboard toko dibuka (cukup, karena setiap toko login berkala setiap hari).
       useEffect(() => {
         pruneOldEntries(db.ref(`${storeBase}/history`), (item) => item.tanggal ? new Date(item.tanggal).getTime() : (item.createdAt || 0));
-        pruneOldEntries(db.ref(`${storeBase}/wasteFotos`), (item) => item.createdAt || (item.tanggal ? new Date(item.tanggal).getTime() : 0));
+        pruneOldEntries(db.ref(`${storeBase}/wasteFotos`), (item) => item.createdAt || (item.tanggal ? new Date(item.tanggal).getTime() : 0), (item) => item.fotoKey ? [item.fotoKey] : []);
         pruneOldEntries(db.ref(`${storeBase}/kedatanganBarang`), (item) => item.createdAt || (item.tanggal ? new Date(item.tanggal).getTime() : 0));
-        pruneOldEntries(db.ref(`${storeBase}/suhuReports`), (item) => item.createdAt || (item.tanggal ? new Date(item.tanggal).getTime() : 0));
+        pruneOldEntries(db.ref(`${storeBase}/suhuReports`), (item) => item.createdAt || (item.tanggal ? new Date(item.tanggal).getTime() : 0), (item) => (item.fotos || []).map(f => f.fotoKey).filter(Boolean));
         pruneOldEntries(db.ref(`chats/${storeId}/messages`), (item) => item.timestamp || 0);
       }, [storeId]);
 
@@ -3571,26 +4122,14 @@ Terima Kasih 🙏🏻`;
         }
 
         const reportMessage = generateReportString(salesData, inventoryData);
-        try {
-          showToast('Mengirim ke Telegram... ✈️');
-          const response = await fetchWithRetry(`https://api.telegram.org/bot${config.telegramBotToken}/sendMessage`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              chat_id: config.telegramChatId,
-              text: reportMessage,
-              parse_mode: 'Markdown'
-            })
-          });
-
-          const result = await response.json();
-          if (result.ok) {
-            showToast('Laporan berhasil dikirim ke Telegram! 🚀');
-          } else {
-            showToast(`Gagal: ${result.description}`);
-          }
-        } catch (error) {
-          showToast('Koneksi bermasalah saat mengirim ke Telegram.');
+        showToast('Mengirim ke Telegram... ✈️');
+        const res = await sendTelegramMessage(config.telegramBotToken, config.telegramChatId, reportMessage);
+        if (res.ok) {
+          showToast('Laporan berhasil dikirim ke Telegram! 🚀');
+        } else {
+          // Pesan error sekarang spesifik (bukan generik) & detailnya sudah dicatat ke console
+          // oleh sendTelegramMessage, sehingga penyebab gagal selalu bisa ditelusuri.
+          showToast(`Gagal mengirim laporan: ${res.error}`);
         }
       };
 
@@ -3724,21 +4263,55 @@ Daily inventory done✅
           return;
         }
 
+        // VALIDASI FIELD WAJIB (perbaikan bug): teks di form sudah menyatakan "Frozen Dough s.d.
+        // Filling wajib pakai No. Faktur/Surat Jalan", tapi sebelumnya tidak ada pengecekan apa pun
+        // di kode — sehingga data Kop Khusus bisa "tersimpan" tanpa No. Faktur/Surat Jalan, membuat
+        // laporan tidak bisa ditelusuri asal suratnya. Sekarang benar-benar ditegakkan di sini.
+        if (hasKhusus && !kedatanganForm.noSuratJalan.trim()) {
+          showToast('⚠️ No. Faktur/Surat Jalan wajib diisi untuk item Frozen Dough s.d. Filling (Kop Khusus).');
+          return;
+        }
+        if (!kedatanganForm.tanggal) {
+          showToast('⚠️ Tanggal kedatangan wajib diisi.');
+          return;
+        }
+
         setIsSavingKedatangan(true);
         try {
           const now = Date.now();
-          // Bersihkan items: pastikan tidak ada nilai undefined yang bisa membuat proses
-          // simpan/tampilan berikutnya berperilaku tak terduga.
+          // Bersihkan & KONVERSI TIPE DATA items: input HTML selalu mengirim string
+          // (e.target.value), padahal field ini seharusnya numerik. Sebelumnya nilai string
+          // mentah ("5", "", "abc") langsung disimpan apa adanya ke database tanpa konversi
+          // maupun validasi, sehingga tipe data tidak konsisten antar-entri dan bisa membuat
+          // penjumlahan/laporan di tempat lain salah hitung atau gagal. Di sini setiap nilai
+          // dipastikan berupa Number yang valid (>0) sebelum disimpan; nilai kosong/0/tidak
+          // valid tidak ikut disimpan sama sekali.
           const safeItems = {};
           Object.keys(kedatanganForm.items || {}).forEach((k) => {
             const v = kedatanganForm.items[k];
             if (v === undefined || v === null) return;
-            safeItems[k] = v;
+            if (v && typeof v === 'object') {
+              // Item Kop Khusus: { jumlah, tanggalProduksi }
+              const jumlahNum = numVal(v.jumlah);
+              if (jumlahNum > 0) {
+                safeItems[k] = { jumlah: jumlahNum, tanggalProduksi: String(v.tanggalProduksi || '').trim() };
+              }
+            } else {
+              const jumlahNum = numVal(v);
+              if (jumlahNum > 0) safeItems[k] = jumlahNum;
+            }
           });
+
+          if (Object.keys(safeItems).length === 0 && !hasTidakSesuai) {
+            showToast('⚠️ Jumlah barang tidak valid. Isi angka lebih dari 0.');
+            setIsSavingKedatangan(false);
+            return;
+          }
+
           const payload = {
             id: now.toString(),
-            tanggal: kedatanganForm.tanggal || new Date().toISOString().split('T')[0],
-            noSuratJalan: kedatanganForm.noSuratJalan || '',
+            tanggal: kedatanganForm.tanggal,
+            noSuratJalan: (kedatanganForm.noSuratJalan || '').trim(),
             items: safeItems,
             tidakSesuai: Array.isArray(kedatanganForm.tidakSesuai) ? [...kedatanganForm.tidakSesuai] : [],
             createdAt: now
@@ -3753,8 +4326,11 @@ Daily inventory done✅
           });
           handleResetKedatanganForm();
         } catch (error) {
-          console.error('Gagal menyimpan data kedatangan barang:', error);
-          showToast('Gagal menyimpan data. Cek koneksi internet, lalu coba lagi.');
+          // Log detail penyebab ke console (bukan cuma pesan generik) supaya mudah didiagnosis:
+          // mis. HTTP 401/403 (sesi kedaluwarsa), HTTP 5xx (Worker error), atau TypeError (jaringan putus).
+          console.error('Gagal menyimpan data kedatangan barang. Detail:', error);
+          const reason = (error && error.message) ? error.message : 'periksa koneksi internet Anda';
+          showToast(`Gagal menyimpan data: ${reason}. Data belum tersimpan, silakan coba lagi.`);
         } finally {
           setIsSavingKedatangan(false);
         }
@@ -3778,21 +4354,12 @@ Daily inventory done✅
           return;
         }
         const text = generateKedatanganReportString(form);
-        try {
-          showToast('Mengirim ke Telegram... ✈️');
-          const response = await fetchWithRetry(`https://api.telegram.org/bot${config.telegramBotToken}/sendMessage`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ chat_id: config.telegramChatId, text, parse_mode: 'Markdown' })
-          });
-          const result = await response.json();
-          if (result.ok) {
-            showToast('Laporan kedatangan barang terkirim ke Telegram! 🚀');
-          } else {
-            showToast(`Gagal: ${result.description}`);
-          }
-        } catch (error) {
-          showToast('Koneksi bermasalah saat mengirim ke Telegram.');
+        showToast('Mengirim ke Telegram... ✈️');
+        const res = await sendTelegramMessage(config.telegramBotToken, config.telegramChatId, text);
+        if (res.ok) {
+          showToast('Laporan kedatangan barang terkirim ke Telegram! 🚀');
+        } else {
+          showToast(`Gagal mengirim laporan: ${res.error}`);
         }
       };
 
@@ -4016,12 +4583,16 @@ Daily inventory done✅
         setIsSavingFoto(true);
         try {
           const now = Date.now();
+          // Upload dulu ke R2 — database cuma menyimpan URL & key-nya, bukan base64 mentah,
+          // supaya storage tetap ringan (lihat juga fitur hapus laporan di Panel Admin).
+          const { url: fotoUrl, key: fotoKey } = await uploadMediaToR2(wasteFotoForm.fotoPreview, `wasteFotos/${storeBase}`, 'jpg');
           const payload = {
             id: now.toString(),
             kategori: wasteFotoForm.kategori,
             jumlah: numVal(wasteFotoForm.jumlah),
             keterangan: wasteFotoForm.keterangan || '',
-            foto: wasteFotoForm.fotoPreview,
+            foto: fotoUrl,
+            fotoKey: fotoKey,
             tanggal: new Date(now).toISOString().split('T')[0],
             createdAt: now
           };
@@ -4463,6 +5034,17 @@ Daily inventory done✅
         try {
           const now = Date.now();
           const tanggal = new Date(now).toISOString().split('T')[0];
+
+          // Upload semua foto ke R2 dulu — yang disimpan ke database adalah URL & key-nya saja
+          // (bukan base64), supaya database tetap ringan. Kolase & pengiriman ke Telegram di
+          // bawah tetap pakai `suhuForm.fotos` versi base64 asli di memori, jadi tidak terpengaruh.
+          const uploadedFotos = await Promise.all(
+            suhuForm.fotos.map(async (f) => {
+              const { url, key } = await uploadMediaToR2(f.foto, `suhuReports/${storeBase}`, 'jpg');
+              return { foto: url, fotoKey: key, timestamp: f.timestamp };
+            })
+          );
+
           const payload = {
             id: now.toString(),
             store: suhuForm.store.trim(),
@@ -4471,7 +5053,7 @@ Daily inventory done✅
             suhuLuar: numVal(suhuForm.suhuLuar),
             suhuDalam: numVal(suhuForm.suhuDalam),
             suhuRuangan: numVal(suhuForm.suhuRuangan),
-            fotos: suhuForm.fotos,
+            fotos: uploadedFotos,
             tanggal,
             createdAt: now
           };
@@ -4625,8 +5207,14 @@ Daily inventory done✅
                   TB
                 </div>
                 <div className="min-w-0">
-                  <h1 className="font-bold text-sm md:text-base tracking-wide truncate">TAROBUN</h1>
-                  <p className="text-[10px] text-purple-200 truncate">Toko: {storeName}</p>
+                  <h1 className="font-display font-extrabold text-sm md:text-base tracking-wide truncate">TAROBUN</h1>
+                  <p className="text-[10px] text-purple-200 truncate flex items-center gap-1.5">
+                    <span>Toko: {storeName}</span>
+                    <span className="flex items-center gap-1 shrink-0">
+                      <PresenceDot isOnline={isNetworkOnline} size="w-1.5 h-1.5" />
+                      <span className={isNetworkOnline ? 'text-emerald-300' : 'text-rose-300'}>{isNetworkOnline ? 'Terhubung' : 'Tidak ada koneksi'}</span>
+                    </span>
+                  </p>
                 </div>
               </div>
               <div className="flex items-center gap-2 shrink-0">
@@ -4651,6 +5239,16 @@ Daily inventory done✅
             </div>
           </header>
 
+          {/* Banner peringatan koneksi terputus — muncul otomatis begitu offline, hilang otomatis
+              begitu koneksi pulih. Tujuannya supaya toko sadar SEBELUM mengisi laporan panjang,
+              bukan baru tahu setelah tombol "Simpan" gagal & harus mengulang. */}
+          {!isNetworkOnline && (
+            <div className="bg-rose-600 text-white text-center text-xs font-bold px-4 py-2 flex items-center justify-center gap-2 sticky top-[52px] z-20">
+              <i data-lucide="wifi-off" className="w-3.5 h-3.5"></i>
+              Tidak ada koneksi internet — data belum tentu tersimpan. Periksa WiFi/kuota Anda.
+            </div>
+          )}
+
           {showOnboarding && (
             <Onboarding
               steps={STORE_ONBOARDING_STEPS}
@@ -4662,17 +5260,17 @@ Daily inventory done✅
           {showMenu && (
             <div className="fixed inset-0 z-40 flex">
               {/* Overlay */}
-              <div className="fixed inset-0 bg-black/50" onClick={() => setShowMenu(false)}></div>
+              <div className="fixed inset-0 bg-black/50 animate-fadeIn" onClick={() => setShowMenu(false)}></div>
 
               {/* Panel */}
-              <div className="relative bg-white w-72 max-w-[80%] h-full shadow-xl flex flex-col">
+              <div className="relative bg-white w-72 max-w-[80%] h-full shadow-xl flex flex-col animate-slideInLeft">
                 <div className="bg-gradient-to-r from-purple-800 to-indigo-900 text-white px-4 py-4 flex items-center justify-between">
                   <div className="flex items-center space-x-2">
                     <div className="bg-white text-purple-800 w-8 h-8 rounded-full font-bold flex items-center justify-center text-md tracking-wider">
                       TB
                     </div>
                     <div>
-                      <h2 className="font-bold text-sm tracking-wide">TAROBUN</h2>
+                      <h2 className="font-display font-extrabold text-sm tracking-wide">TAROBUN</h2>
                       <p className="text-[10px] text-purple-200">Menu Navigasi</p>
                     </div>
                   </div>
@@ -6269,7 +6867,7 @@ Daily inventory done✅
                             {selectedSopCategory.media.map(m => (
                               m.type === 'image' ? (
                                 <button key={m.id} onClick={() => setSopLightboxUrl(m.url)} className="aspect-square bg-slate-100 rounded-lg overflow-hidden">
-                                  <img src={m.url} alt={m.name} className="w-full h-full object-cover" />
+                                  <img src={m.url} alt={m.originalName || m.name} className="w-full h-full object-cover" />
                                 </button>
                               ) : (
                                 <video key={m.id} src={m.url} controls className="aspect-square w-full bg-black rounded-lg object-cover"></video>
@@ -6284,8 +6882,8 @@ Daily inventory done✅
 
                 {/* Lightbox foto */}
                 {sopLightboxUrl && (
-                  <div className="fixed inset-0 z-[95] bg-black/80 flex items-center justify-center p-4" onClick={() => setSopLightboxUrl(null)}>
-                    <img src={sopLightboxUrl} className="max-w-full max-h-full rounded-lg" />
+                  <div className="fixed inset-0 z-[95] bg-black/80 flex items-center justify-center p-4 animate-fadeIn" onClick={() => setSopLightboxUrl(null)}>
+                    <img src={sopLightboxUrl} className="max-w-full max-h-full rounded-lg animate-scaleIn" />
                     <button onClick={() => setSopLightboxUrl(null)} className="absolute top-4 right-4 bg-white/10 hover:bg-white/20 text-white rounded-full p-2">
                       <i data-lucide="x" className="w-5 h-5"></i>
                     </button>
@@ -6411,8 +7009,8 @@ Daily inventory done✅
           </form>
 
           {confirmEnd && (
-            <div className="fixed inset-0 z-[95] bg-black/50 flex items-center justify-center p-4">
-              <div className="bg-white rounded-2xl w-full max-w-sm p-6">
+            <div className="fixed inset-0 z-[95] bg-black/50 flex items-center justify-center p-4 animate-fadeIn">
+              <div className="bg-white rounded-2xl animate-scaleIn w-full max-w-sm p-6">
                 <h3 className="font-bold text-slate-800 mb-2">Akhiri Sesi Chat?</h3>
                 <p className="text-xs text-slate-500 mb-4">Seluruh riwayat pesan pada percakapan ini akan <b>dihapus permanen</b> dan tidak bisa dikembalikan. Percakapan akan mulai dari awal lagi.</p>
                 <div className="flex gap-2">
